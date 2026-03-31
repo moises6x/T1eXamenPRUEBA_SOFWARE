@@ -36,4 +36,15 @@ public class InfractorController {
         infractorService.asignarVehiculo(infractorId, vehiculoId);
         return ResponseEntity.ok().build();
     }
+    
+    @GetMapping("/{id}/deuda")
+    public ResponseEntity<Double> obtenerDeuda(@PathVariable Long id) {
+        return ResponseEntity.ok(infractorService.calcularDeuda(id));
+    }
+    
+    @DeleteMapping("/{infractorId}/vehiculos/{vehiculoId}")
+    public ResponseEntity<Void> desasignarVehiculo(@PathVariable Long infractorId, @PathVariable Long vehiculoId) {
+        infractorService.desasignarVehiculo(infractorId, vehiculoId);
+        return ResponseEntity.noContent().build();
+    }
 }

@@ -6,6 +6,7 @@ import edu.pe.cibertec.infracciones.exception.*;
 import edu.pe.cibertec.infracciones.model.*;
 import edu.pe.cibertec.infracciones.repository.*;
 import edu.pe.cibertec.infracciones.service.IMultaService;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import java.time.LocalDate;
@@ -109,5 +110,38 @@ public class MultaServiceImpl implements IMultaService {
                 .map(TipoInfraccion::getDescripcion)
                 .toList());
         return dto;
+    }
+    
+
+    @Override
+    @Transactional 
+    public void transferirMulta(Long multaId, Long nuevoInfractorId) {
+       
+        Multa multa = multaRepository.findById(multaId)
+                .orElseThrow(() -> new RuntimeException("Multa no encontrada"));
+
+   
+        Infractor nuevoInfractor = infractorRepository.findById(nuevoInfractorId)
+                .orElseThrow(() -> new RuntimeException("Nuevo infractor no encontrado"));
+
+      
+     
+        if (nuevoInfractor.isBloqueado()) {
+            throw new InfractorBloqueadoException(nuevoInfractorId);
+        }
+
+        if (multa.getEstado() != EstadoMulta.PENDIENTE) {
+            throw new RuntimeException("Solo se pueden transferir multas en estado PENDIENTE");
+        }
+
+        boolean elVehiculoLePertenece = nuevoInfractor.getVehiculos().stream()
+                .anyMatch(v -> v.getId().equals(multa.getVehiculo().getId()));
+
+        if (!elVehiculoLePertenece) {
+            throw new RuntimeException("El vehículo de la multa no pertenece al nuevo infractor");
+        }
+
+        multa.setInfractor(nuevoInfractor);
+        multaRepository.save(multa);
     }
 }

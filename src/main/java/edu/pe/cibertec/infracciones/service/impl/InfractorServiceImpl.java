@@ -4,9 +4,12 @@ import edu.pe.cibertec.infracciones.dto.InfractorRequestDTO;
 import edu.pe.cibertec.infracciones.dto.InfractorResponseDTO;
 import edu.pe.cibertec.infracciones.exception.InfractorNotFoundException;
 import edu.pe.cibertec.infracciones.exception.VehiculoNotFoundException;
+import edu.pe.cibertec.infracciones.model.EstadoMulta;
 import edu.pe.cibertec.infracciones.model.Infractor;
+import edu.pe.cibertec.infracciones.model.Multa;
 import edu.pe.cibertec.infracciones.model.Vehiculo;
 import edu.pe.cibertec.infracciones.repository.InfractorRepository;
+import edu.pe.cibertec.infracciones.repository.MultaRepository;// <-------
 import edu.pe.cibertec.infracciones.repository.VehiculoRepository;
 import edu.pe.cibertec.infracciones.service.IInfractorService;
 import lombok.RequiredArgsConstructor;
@@ -19,7 +22,10 @@ public class InfractorServiceImpl implements IInfractorService {
 
     private final InfractorRepository infractorRepository;
     private final VehiculoRepository vehiculoRepository;
-
+    
+    private final MultaRepository multaRepository; // <-------
+    
+    
     @Override
     public InfractorResponseDTO registrarInfractor(InfractorRequestDTO dto) {
         Infractor infractor = new Infractor();
@@ -66,5 +72,48 @@ public class InfractorServiceImpl implements IInfractorService {
         dto.setEmail(infractor.getEmail());
         dto.setBloqueado(infractor.isBloqueado());
         return dto;
+    }
+    
+    
+    @Override
+    public Double calcularDeuda(Long infractorId) {
+        // 1. Buscamos todas las multas del infractor
+        List<Multa> multas = multaRepository.findByInfractor_Id(infractorId);
+
+        // 2. Aplicamos la lógica de negocio
+        return multas.stream()
+                .filter(m -> m.getEstado() == EstadoMulta.PENDIENTE || m.getEstado() == EstadoMulta.VENCIDA)
+                .mapToDouble(m -> {
+                    if (m.getEstado() == EstadoMulta.VENCIDA) {
+                        return m.getMonto() * 1.15;
+                    }
+                    return m.getMonto(); 
+                })
+                .sum();
+    }
+    
+    @Override
+    @org.springframework.transaction.annotation.Transactional
+    public void desasignarVehiculo(Long infractorId, Long vehiculoId) {
+       
+        List<Multa> multasActivas = multaRepository.findByInfractor_IdAndVehiculo_IdAndEstado(
+                infractorId, vehiculoId, EstadoMulta.PENDIENTE);
+
+        if (!multasActivas.isEmpty()) {
+            throw new IllegalStateException("No se puede desasignar: El vehículo tiene multas PENDIENTES.");
+        }
+
+        // 2. Obtener las entidades
+        Infractor infractor = infractorRepository.findById(infractorId)
+                .orElseThrow(() -> new InfractorNotFoundException(infractorId));
+
+        // 3. Remover el vehículo de la lista del infractor
+        // Usamos removeIf para encontrar el vehículo por su ID dentro de la lista
+        boolean removido = infractor.getVehiculos().removeIf(v -> v.getId().equals(vehiculoId));
+
+        if (removido) {
+            // 4. Persistir el cambio
+            infractorRepository.save(infractor);
+        }
     }
 }

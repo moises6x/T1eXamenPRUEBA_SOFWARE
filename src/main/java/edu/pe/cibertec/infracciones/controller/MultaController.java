@@ -35,4 +35,14 @@ public class MultaController {
     public ResponseEntity<List<MultaResponseDTO>> obtenerPorVehiculo(@PathVariable Long vehiculoId) {
         return ResponseEntity.ok(multaService.obtenerMultasPorVehiculo(vehiculoId));
     }
+    
+
+    
+    @PutMapping("/{multaId}/transferir/{nuevoInfractorId}")
+    public ResponseEntity<Void> transferirMulta(
+            @PathVariable Long multaId, 
+            @PathVariable Long nuevoInfractorId) {
+        multaService.transferirMulta(multaId, nuevoInfractorId);
+        return ResponseEntity.ok().build();
+    }
 }
